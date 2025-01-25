@@ -1,0 +1,51 @@
+{
+  "name": "langium-visitor",
+  "version": "1.0.0",
+  "description": "A CLI tool to generate visitor classes for Langium grammars",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "langium-visitor": "./bin/cli.js"
+  },
+  "keywords": [
+    "cli",
+    "langium",
+    "visitor",
+    "typescript"
+  ],
+  "files": [
+    "bin",
+    "src",
+    "dist",
+    "templates"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    }
+  },
+  "license": "MPL-2.0",
+  "scripts": {
+    "start": "tsc && node dist/main.js",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.10",
+    "@types/nunjucks": "^3.2.6",
+    "eslint": "^9.18.0",
+    "globals": "^15.14.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.21.0"
+  },
+  "dependencies": {
+    "langium": "^3.3.1",
+    "nunjucks": "^3.2.4"
+  },
+  "author": "Théo Giraudet",
+  "bugs": {
+    "url": "https://github.com/theogiraudet/langium-visitor/issues"
+  },
+  "homepage": "https://github.com/theogiraudet/langium-visitor#readme"
+}

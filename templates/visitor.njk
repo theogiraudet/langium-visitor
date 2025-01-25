@@ -1,0 +1,20 @@
+
+import * as ASTInterfaces from '../language/generated/ast.js';
+import { Reference } from 'langium';
+
+export interface Visitor {
+    {%- for interface in interfaces %}
+    visit{{ interface.name }}(node : ASTInterfaces.{{ interface.name }}) : any;
+    {%- endfor %}
+}
+
+{% for interface in interfaces %}
+export class {{ interface.name }} implements ASTInterfaces.{{ interface.name }} {
+    
+    constructor(public $type: '{{ interface.name }}'{% if interface.containerTypes.length > 0 %}, public $container: {% for superType in interface.containerTypes %}{{ superType }}{% if not loop.last %} | {% endif %}{% endfor %}{% endif %}{% if interface.attributes.length > 0 %},{% for attribute in interface.attributes %} public {{ attribute.name }}: {{ attribute.type }}{% if not loop.last %},{% endif %}{% endfor %}{% endif %}) {}
+    
+    accept(visitor: Visitor) : any {
+        // TODO
+    }
+}
+{% endfor %}

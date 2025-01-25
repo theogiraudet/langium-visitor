@@ -1,0 +1,31 @@
+import type { ValidationAcceptor, ValidationChecks } from 'langium';
+import type { {{ projectName }}AstType } from '../language/generated/ast.js';
+import * as InterfaceAST from '../language/generated/ast.js';
+import * as ClassAST from './{{ projectId }}-visitor.js';
+import { Visitor } from './{{ projectId }}-visitor.js';
+import type { {{ projectName }}Services } from '../language/{{ projectId }}-module.js';
+
+/**
+ * Register custom validation checks.
+ * TODO : Call this function in the language module.ts file (see registerValidationChecks(...);)
+ */
+export function weaveAcceptMethods(services: {{ projectName }}Services) {
+    const registry = services.validation.ValidationRegistry;
+    const weaver = services.validation.{{ projectName }}AcceptWeaver
+    registry.register(weaver.checks, weaver);
+}
+
+export class {{ projectName }}AcceptWeaver {
+    
+    checks: ValidationChecks<{{ projectName }}AstType> = {
+        {%- for interface in interfaces %}
+        {{ interface.name }}: this.weave{{ interface.name }}{% if not loop.last %},{% endif %}
+        {%- endfor %}
+    };
+
+    {% for interface in interfaces %}
+    weave{{ interface.name }}(node : InterfaceAST.{{ interface.name }}, accept : ValidationAcceptor) : void {
+        (<any> node).accept = (visitor: Visitor) => { return visitor.visit{{ interface.name }}(node as unknown as ClassAST.{{ interface.name }}); }
+    }
+    {% endfor %}
+}
