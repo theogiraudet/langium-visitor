@@ -25,7 +25,7 @@ async function main() {
         if(grammar) {
             const ast = collectAst(grammar);
             const interfaces = ast.interfaces;
-            const flattened = flattenForest(interfaces);
+            const flattened = flattenInterfaces(interfaces);
             const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
             generateFiles(id, projectName, translated);
         }       
@@ -34,6 +34,10 @@ async function main() {
 
 
 
+/**
+ * Parse the Langium grammar from the generated "src/language/generated/grammar.ts" file
+ * @returns The Langium grammar
+ */
 async function parseLangiumGrammar(): Promise<GrammarAST.Grammar | undefined> {
     let content: string;
     try {
@@ -71,26 +75,26 @@ function getProjectName(): { projectName: string, id: string } | undefined {
 }
 
 
-
 /**
- * Flatten the forest of trees into a list of interfaces, each resulting interface is a leaf of one of the tree and contains all the attributes of its parents
- * @param forest The forest of trees to flatten
+ * Flatten interfaces into a list of interfaces, each resulting interface contains all the attributes of its parents
+ * An interface is a leaf if it has no subtypes
+ * @param interfaces The list of interfaces to flatten
  * @returns The list of interfaces
  */
-function flattenForest(interfaces: InterfaceType[]): FlattenedInterface[] {
+function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
     const map = new Map<string, FlattenedInterface>();
-    interfaces.forEach(interface_ => flattenTree(interface_, [], map));
+    interfaces.forEach(interface_ => flattenType(interface_, [], map));
     return Array.from(map.values());
 }
 
 /**
- * Flatten a tree into a list of interfaces, each interface has the attributes of its parents
- * If the tree is a leaf, the resulting interface is marked as concrete
- * @param tree The tree to flatten
- * @param attributes The attributes of the parents of the current tree
+ * Flatten a type into a list of interfaces, each interface has the attributes of its parents
+ * If the type is a leaf, the resulting interface is marked as concrete
+ * @param type_ The type to flatten
+ * @param attributes The attributes of the parents of the current type
  * @param map The map of already built interfaces
  */
-function flattenTree(type_: TypeOption, attributes: Property[], map: Map<string, FlattenedInterface>) {
+function flattenType(type_: TypeOption, attributes: Property[], map: Map<string, FlattenedInterface>) {
     if(!Object.prototype.hasOwnProperty.call(type_, 'properties')) {
         console.error("Unsupported union type: " + type_.name);
         return;
@@ -106,7 +110,7 @@ function flattenTree(type_: TypeOption, attributes: Property[], map: Map<string,
     map.set(interface_.name, flattened);
 
     if(type_.subTypes.size > 0) {
-        type_.subTypes.forEach(subType => flattenTree(subType, [...attributes, ...interface_.properties], map));
+        type_.subTypes.forEach(subType => flattenType(subType, [...attributes, ...interface_.properties], map));
     }
 }
 
@@ -155,9 +159,15 @@ function translateType(type: PropertyType | undefined): string {
 }
 
 
-
+/**
+ * Generate the visitor files
+ * @param projectId The ID of the project
+ * @param projectName The name of the project
+ * @param interfaces The list of interfaces to generate
+ */
 function generateFiles(projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[]) {
     let failed = false;
+    // Check if the attribute names are valid Typescript identifiers
     for(const attributes of interfaces.flatMap(interface_ => interface_.attributes)) {
         if(keywords.includes(attributes.name)) {
             console.error(`Reserved keyword ${attributes.name} cannot be used as an attribute name.`);
