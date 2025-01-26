@@ -38,33 +38,18 @@ import { <LanguageName>AcceptWeaver, weaveAcceptMethods } from '../semantics/<la
 
 ...
 
-export const <LanguageName>Module: Module<<LanguageName>Services, PartialLangiumServices & <LanguageName>AddedServices> = {
-    validation: {
-        <LanguageName>AcceptWeaver: () => new <LanguageName>AcceptWeaver()
-    }
-};
+// On your module definition
+validation: {
+    <LanguageName>AcceptWeaver: () => new <LanguageName>AcceptWeaver()
+}
 
 ...
 
-export function create<LanguageName>Services(context: DefaultSharedModuleContext): {
-    shared: LangiumSharedServices,
-    <LanguageName>: <LanguageName>Services
-} {
-    const shared = inject(
-        createDefaultSharedModule(context),
-        <LanguageName>GeneratedSharedModule
-    );
-    const <LanguageName> = inject(
-        createDefaultModule({ shared }),
-        <LanguageName>GeneratedModule,
-        <LanguageName>Module
-    );
-    shared.ServiceRegistry.register(<LanguageName>);
-    registerValidationChecks(<LanguageName>);
-    weaveAcceptMethods(<LanguageName>);
-    if (!context.connection) {
-        shared.workspace.ConfigurationProvider.initialized({});
-    }
-    return { shared, <LanguageName> };
-}
+// On the create services function
+weaveAcceptMethods(<LanguageName>);
 ```
+
+### Create a new concrete Visitor
+
+To create a new concrete Visitor, you just need to create a new class that implements the `Visitor` interface.
+If the main goal of this visitor is to program dynamic semantics, it is recommended to place your concrete visitor in the `src/cli` directory to follow Langium's convention.

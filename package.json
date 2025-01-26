@@ -40,6 +40,7 @@
     "typescript-eslint": "^8.21.0"
   },
   "dependencies": {
+    "chalk": "^5.4.1",
     "langium": "^3.3.1",
     "nunjucks": "^3.2.4"
   },

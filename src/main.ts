@@ -1,10 +1,11 @@
 import fs from "fs";
 import { GrammarAST, loadGrammarFromJson } from "langium";
-import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface as FlattenedTranslatedInterface } from "./types.js";
+import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface as FlattenedTranslatedInterface, OverrideProperty } from "./types.js";
 import nunjucks from "nunjucks";
 import path from "path";
 import { fileURLToPath } from "url";
 import { collectAst, InterfaceType, isArrayType, isPrimitiveType, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, TypeOption } from "langium/grammar";
+import chalk from "chalk";
 
 const workdir = process.cwd();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,7 +16,6 @@ const keywords = ["break", "case", "catch", "class", "const", "continue", "debug
 
 main();
 
-// Since Langium 2.0.0, some interfaces may not have $container when their container are too complex to compute: https://github.com/eclipse-langium/langium/pull/1055
 
 async function main() {
     const projectInfo = getProjectName();
@@ -32,8 +32,6 @@ async function main() {
     }
 }
 
-
-
 /**
  * Parse the Langium grammar from the generated "src/language/generated/grammar.ts" file
  * @returns The Langium grammar
@@ -43,14 +41,14 @@ async function parseLangiumGrammar(): Promise<GrammarAST.Grammar | undefined> {
     try {
         content = fs.readFileSync(workdir + '/src/language/generated/grammar.ts', "utf8");
     } catch (error) {
-        console.error("Failed to read 'src/language/generated/grammar.ts'. Make sure to run 'npm run langium:generate' before running this script.");
+        console.error(chalk.red("Failed to read 'src/language/generated/grammar.ts'. Make sure to run 'npm run langium:generate' before running this script."));
         return;
     }
 
     const jsonGrammar = content.split('`');
     
     if(jsonGrammar.length < 2) {
-        console.error("Failed to get JSON Langium grammar from 'src/language/generated/grammar.ts'.");
+        console.error(chalk.red("Failed to get JSON Langium grammar from 'src/language/generated/grammar.ts'."));
         return;
     }
 
@@ -69,7 +67,7 @@ function getProjectName(): { projectName: string, id: string } | undefined {
         const json = JSON.parse(config);
         return { projectName: json.projectName, id: json.languages[0].id };
     } catch (error) {
-        console.error("Failed to get Langium project name");
+        console.error(chalk.red("Failed to get Langium project name"));
         return undefined;
     }
 }
@@ -83,7 +81,7 @@ function getProjectName(): { projectName: string, id: string } | undefined {
  */
 function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
     const map = new Map<string, FlattenedInterface>();
-    interfaces.forEach(interface_ => flattenType(interface_, [], map));
+    interfaces.forEach(interface_ => flattenType(interface_, [], undefined, map));
     return Array.from(map.values());
 }
 
@@ -93,25 +91,33 @@ function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
  * @param type_ The type to flatten
  * @param attributes The attributes of the parents of the current type
  * @param map The map of already built interfaces
+ * @returns The subtypes name
  */
-function flattenType(type_: TypeOption, attributes: Property[], map: Map<string, FlattenedInterface>) {
+function flattenType(type_: TypeOption, attributes: Property[], directSuperType: string | undefined, map: Map<string, FlattenedInterface>): string[] {
     if(!Object.prototype.hasOwnProperty.call(type_, 'properties')) {
-        console.error("Unsupported union type: " + type_.name);
-        return;
+        console.error(chalk.red("Unsupported union type: " + type_.name));
+        return [];
     }
 
     const interface_ = type_ as InterfaceType;
 
     if(map.has(type_.name)) {
-        return;
+        return [];
     }
     
-    const flattened: FlattenedInterface = { name: interface_.name, properties: [...attributes, ...interface_.properties], isConcrete: interface_.properties.length === 0, containerTypes: [...interface_.containerTypes] };
+    const types: string[] = [interface_.name]
+    const properties: OverrideProperty[] = attributes.map(attribute => ({ property: attribute, override: true }));
+    interface_.properties.forEach(property => properties.push({ property, override: false }));
+
+    const flattened: FlattenedInterface = { name: interface_.name, properties, isConcrete: interface_.properties.length === 0, containerTypes: [...interface_.containerTypes], types: types, directSuperType };
     map.set(interface_.name, flattened);
 
+
     if(type_.subTypes.size > 0) {
-        type_.subTypes.forEach(subType => flattenType(subType, [...attributes, ...interface_.properties], map));
+        type_.subTypes.forEach(subType => types.push(...flattenType(subType, [...attributes, ...interface_.properties], interface_.name, map)));
     }
+
+    return flattened.types;
 }
 
 
@@ -122,9 +128,9 @@ function flattenType(type_: TypeOption, attributes: Property[], map: Map<string,
  */
 function translateFlattenedInterface(interface_: FlattenedInterface): FlattenedTranslatedInterface {
     const superTypes = interface_.containerTypes.map(superType => superType.name);
-    const translated: FlattenedTranslatedInterface = { name: interface_.name, attributes: [], isConcrete: interface_.isConcrete, containerTypes: superTypes };
+    const translated: FlattenedTranslatedInterface = { name: interface_.name, attributes: [], isConcrete: interface_.isConcrete, containerTypes: superTypes, types: interface_.types, directSuperType: interface_.directSuperType };
     for(const property of interface_.properties) {
-        translated.attributes.push({ name: property.name, type: translateType(property.type) });
+        translated.attributes.push({ name: property.property.name, type: translateType(property.property.type), override: property.override });
     }
     return translated;
 }
@@ -136,7 +142,7 @@ function translateFlattenedInterface(interface_: FlattenedInterface): FlattenedT
  */
 function translateType(type: PropertyType | undefined): string {
     if(!type) {
-        console.error("Unknown type");
+        console.error(chalk.red("Unknown type"));
         return "unknown";
     }
 
@@ -153,7 +159,7 @@ function translateType(type: PropertyType | undefined): string {
     } else if(isValueType(type)) {
         return type.value.name;
     } else {
-        console.error("Unknown type: PropertyUnion");
+        console.error(chalk.red("Unknown type: PropertyUnion"));
     }
     return '';
 }
@@ -170,13 +176,13 @@ function generateFiles(projectId: string, projectName: string, interfaces: Flatt
     // Check if the attribute names are valid Typescript identifiers
     for(const attributes of interfaces.flatMap(interface_ => interface_.attributes)) {
         if(keywords.includes(attributes.name)) {
-            console.error(`Reserved keyword ${attributes.name} cannot be used as an attribute name.`);
+            console.error(chalk.red(`Reserved keyword ${attributes.name} cannot be used as an attribute name.`));
             failed = true;
         }
     }
 
     if(failed) {
-        console.error("Failed to generate files.");
+        console.error(chalk.red("Failed to generate files."));
         return;
     }
 
@@ -188,5 +194,6 @@ function generateFiles(projectId: string, projectName: string, interfaces: Flatt
     }
     fs.writeFileSync(workdir + `/src/semantics/${projectId}-visitor.ts`, visitor);
     fs.writeFileSync(workdir + `/src/semantics/${projectId}-accept-weaver.ts`, acceptWeaver);
+    console.log(chalk.green("Files generated successfully."));
 }
 
