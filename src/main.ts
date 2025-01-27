@@ -49,7 +49,7 @@ async function parseLangiumGrammar(): Promise<GrammarAST.Grammar | undefined> {
         return;
     }
 
-    return loadGrammarFromJson(jsonGrammar[1]);
+    return loadGrammarFromJson(jsonGrammar[1].replaceAll("\\\\", "\\"));
 }
 
 
