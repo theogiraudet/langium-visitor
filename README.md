@@ -53,3 +53,13 @@ weaveAcceptMethods(<LanguageName>);
 
 To create a new concrete Visitor, you just need to create a new class that implements the `Visitor` interface.
 If the main goal of this visitor is to program dynamic semantics, it is recommended to place your concrete visitor in the `src/cli` directory to follow Langium's convention.
+
+### CLI Arguments
+
+| Argument | Description | Default Value | Optional |
+| -------- | ----------- | ------------- | -------- |
+| `--out <path>` | The output directory for the generated files | `src/semantics` | Yes |
+| `--module <path>` | The path to the module file | `src/language/<language-id>-module.ts` | Yes |
+| `--grammar <path>` | The path to the grammar file | output path specified in the Langium config file + `/grammar.ts` | Yes |
+| `--ast <path>` | The path to the AST file | output path specified in the Langium config file + `/ast.ts` | Yes |
+| `--config <path>` | The path to the Langium config file | `langium-config.json` | Yes |

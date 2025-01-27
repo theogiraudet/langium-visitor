@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1
+
+- Fix a parse error during the parsing of the grammar.ts file, due to to many escape characters. This error caused the generator not to work on the Hello World Langium project.
+- Fix a bug during the identification of concrete grammar types.
+- Add CLI arguments to specify the output directory, the grammar file, the AST file, the module file and the Langium config file. This arguments are optional and will use the default values if not specified.
+- The generator now use the `langium-config.json` file to get the output directory of the grammar and AST files.
+
 ## 1.1.0
 
 - Added colors to the CLI errors.
