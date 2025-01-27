@@ -1,9 +1,9 @@
 import type { ValidationAcceptor, ValidationChecks } from 'langium';
-import type { {{ projectName }}AstType } from '../language/generated/ast.js';
-import * as InterfaceAST from '../language/generated/ast.js';
+import type { {{ projectName }}AstType } from '{{ resolvedImportAst }}';
+import * as InterfaceAST from '{{ resolvedImportAst }}';
 import * as ClassAST from './{{ projectId }}-visitor.js';
 import { {{ projectName }}Visitor } from './{{ projectId }}-visitor.js';
-import type { {{ projectName }}Services } from '../language/{{ projectId }}-module.js';
+import type { {{ projectName }}Services } from '{{ resolvedImportModule }}';
 
 /**
  * Register custom validation checks.

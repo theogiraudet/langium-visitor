@@ -7,45 +7,49 @@ import { fileURLToPath } from "url";
 import { collectAst, InterfaceType, isArrayType, isPrimitiveType, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, TypeOption } from "langium/grammar";
 import chalk from "chalk";
 
-const workdir = process.cwd();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const templatesDir = path.resolve(__dirname, "..", "templates");
 
 // Reserved typescript keywords
 const keywords = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "as", "implements", "interface", "let", "package", "private", "protected", "public", "static", "yield", "any", "boolean", "constructor", "declare", "get", "module", "require", "number", "set", "string", "symbol", "type", "from", "of"]
 
-export async function main() {
-    const projectInfo = getProjectName();
+export async function generate(outputPath: string = "src/semantics", modulePath?: string, grammarPath?: string, astPath?: string, langiumConfigPath: string = "langium-config.json") {
+    const projectInfo = getProjectName(langiumConfigPath);
     if (projectInfo) {
-        const { projectName, id } = projectInfo;
-        const grammar = await parseLangiumGrammar();
+        const { projectName, id, outputDir } = projectInfo;
+        grammarPath = grammarPath || path.join(outputDir, "grammar.ts");
+        astPath = astPath || path.join(outputDir, "ast.ts");
+        modulePath = modulePath || path.join("src", "language", `${id}-module.ts`);
+
+        const grammar = await parseLangiumGrammar(grammarPath);
         if(grammar) {
             const ast = collectAst(grammar);
             const interfaces = ast.interfaces;
             const flattened = flattenInterfaces(interfaces);
             const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
-            generateFiles(id, projectName, translated);
+            generateFiles(outputPath, astPath, modulePath, id, projectName, translated);
         }       
     }
 }
 
 /**
- * Parse the Langium grammar from the generated "src/language/generated/grammar.ts" file
+ * Parse the Langium grammar from the generated grammar.ts file
+ * @param grammarPath The path to the grammar file
  * @returns The Langium grammar
  */
-async function parseLangiumGrammar(): Promise<GrammarAST.Grammar | undefined> {
+async function parseLangiumGrammar(grammarPath: string): Promise<GrammarAST.Grammar | undefined> {
     let content: string;
     try {
-        content = fs.readFileSync(workdir + '/src/language/generated/grammar.ts', "utf8");
+        content = fs.readFileSync(grammarPath, "utf8");
     } catch (error) {
-        console.error(chalk.red("Failed to read 'src/language/generated/grammar.ts'. Make sure to run 'npm run langium:generate' before running this script."));
+        console.error(chalk.red(`Failed to read '${grammarPath}'. Make sure to run 'npm run langium:generate' before running this script.`));
         return;
     }
 
     const jsonGrammar = content.split('`');
     
     if(jsonGrammar.length < 2) {
-        console.error(chalk.red("Failed to get JSON Langium grammar from 'src/language/generated/grammar.ts'."));
+        console.error(chalk.red(`Failed to get JSON Langium grammar from '${grammarPath}'`));
         return;
     }
 
@@ -56,13 +60,14 @@ async function parseLangiumGrammar(): Promise<GrammarAST.Grammar | undefined> {
 
 /**
  * Get the project name and the ID of the first language from the langium-config.json file
+ * @param langiumConfigPath The path to the langium-config.json file
  * @returns The project name and the ID of the first language, or undefined if the file is not found or the JSON is invalid
  */
-function getProjectName(): { projectName: string, id: string } | undefined {
+function getProjectName(langiumConfigPath: string): { projectName: string, id: string, outputDir: string } | undefined {
     try {
-        const config = fs.readFileSync(workdir + "/langium-config.json", "utf8");
+        const config = fs.readFileSync(langiumConfigPath, "utf8");
         const json = JSON.parse(config);
-        return { projectName: json.projectName, id: json.languages[0].id };
+        return { projectName: json.projectName, id: json.languages[0].id, outputDir: json.out };
     } catch (error) {
         console.error(chalk.red("Failed to get Langium project name"));
         return undefined;
@@ -106,7 +111,7 @@ function flattenType(type_: TypeOption, attributes: Property[], directSuperType:
     const properties: OverrideProperty[] = attributes.map(attribute => ({ property: attribute, override: true }));
     interface_.properties.forEach(property => properties.push({ property, override: false }));
 
-    const flattened: FlattenedInterface = { name: interface_.name, properties, isConcrete: interface_.properties.length === 0, containerTypes: [...interface_.containerTypes], types: types, directSuperType };
+    const flattened: FlattenedInterface = { name: interface_.name, properties, isConcrete: interface_.subTypes.size === 0, containerTypes: [...interface_.containerTypes], types: types, directSuperType };
     map.set(interface_.name, flattened);
 
 
@@ -164,11 +169,13 @@ function translateType(type: PropertyType | undefined): string {
 
 /**
  * Generate the visitor files
+ * @param outputDir The path to the output directory
+ * @param astDir The path to the AST directory to compute import paths
  * @param projectId The ID of the project
  * @param projectName The name of the project
  * @param interfaces The list of interfaces to generate
  */
-function generateFiles(projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[]) {
+function generateFiles(outputDir: string, astDir: string, moduleDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[]) {
     let failed = false;
     // Check if the attribute names are valid Typescript identifiers
     for(const attributes of interfaces.flatMap(interface_ => interface_.attributes)) {
@@ -184,13 +191,23 @@ function generateFiles(projectId: string, projectName: string, interfaces: Flatt
     }
 
     nunjucks.configure(templatesDir, { autoescape: false });
-    const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces });
-    const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete) });
-    if(!fs.existsSync(workdir + `/src/semantics`)) {
-        fs.mkdirSync(workdir + `/src/semantics`);
+    let resolvedImportAst = path.relative(outputDir, astDir).replace(".ts", ".js").replaceAll("\\", "/");
+    let resolvedImportModule = path.relative(outputDir, moduleDir).replace(".ts", ".js").replaceAll("\\", "/");
+
+    if(!resolvedImportAst.startsWith(".")) {
+        resolvedImportAst = "./" + resolvedImportAst;
     }
-    fs.writeFileSync(workdir + `/src/semantics/${projectId}-visitor.ts`, visitor);
-    fs.writeFileSync(workdir + `/src/semantics/${projectId}-accept-weaver.ts`, acceptWeaver);
+    if(!resolvedImportModule.startsWith(".")) {
+        resolvedImportModule = "./" + resolvedImportModule;
+    }
+    
+    const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst });
+    const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete), resolvedImportAst, resolvedImportModule });
+    if(!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir);
+    }
+    fs.writeFileSync(path.join(outputDir, `${projectId}-visitor.ts`), visitor);
+    fs.writeFileSync(path.join(outputDir, `${projectId}-accept-weaver.ts`), acceptWeaver);
     console.log(chalk.green("Files generated successfully."));
 }
 

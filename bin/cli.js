@@ -1,4 +1,4 @@
 #!/usr/bin/env node
 
-import { main } from '../dist/main.js';
-main();
+import { generate } from '../dist/cli.js';
+generate();
