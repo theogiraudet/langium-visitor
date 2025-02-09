@@ -12,10 +12,10 @@ export interface {{ projectName}}Visitor {
 export class {{ interface.name }} {% if interface.directSuperType %}extends {{ interface.directSuperType }} {% endif %}implements ASTInterfaces.{{ interface.name }} {
     
     constructor(public{% if interface.directSuperType %} override{% endif %} $type: {% for type in interface.types %}'{{ type }}'{% if not loop.last %} | {% endif %}{% endfor -%}
-    {% if interface.containerTypes.length > 0 %}, public $container: {% for superType in interface.containerTypes %}{{ superType }}{% if not loop.last %} | {% endif %}{% endfor %}{% endif -%}
+    {% if interface.containerTypes.length > 0 %}, public{% if interface.overrideContainers %} override{% endif %} $container: {% for superType in interface.containerTypes %}{{ superType }}{% if not loop.last %} | {% endif %}{% endfor %}{% endif -%}
     {% if interface.attributes.length > 0 %}, {% for attribute in interface.attributes %}public{% if attribute.override %} override{% endif %} {{ attribute.name }}: {{ attribute.type }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}) {
         {%- if interface.directSuperType %}
-        super($type{% if interface.attributes.length > 0 %}{% for attribute in interface.attributes %}{% if attribute.override %}, {{ attribute.name }}{% endif %}{% endfor %}{% endif %});
+        super($type{% if interface.attributes.length > 0 %}{% if interface.overrideContainers %}, $container{% endif %}{% for attribute in interface.attributes %}{% if attribute.override %}, {{ attribute.name }}{% endif %}{% endfor %}{% endif %});
         {%- endif %}
     }
     
