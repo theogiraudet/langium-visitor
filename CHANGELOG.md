@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2
+
+- Fixed the generation of the visitor classes when the container types come from a supertype. The `$container` attribute was not prefixed with `override` when needed, and was not given to the super constructor.
+- Fixed a fail during the generation of the visitor when a `PropertyUnion` type was encountered. PropertyUnion are now translated into a TypeScript union type.
+
 ## 1.1.1
 
 - Fix a parse error during the parsing of the grammar.ts file, due to to many escape characters. This error caused the generator not to work on the Hello World Langium project.
