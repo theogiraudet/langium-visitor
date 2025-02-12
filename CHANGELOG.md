@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+
+- The Visitor used the Langium interfaces as "visit" methods paramater instead of our custom classes.
+
 ## 1.1.2
 
 - Fixed the generation of the visitor classes when the container types come from a supertype. The `$container` attribute was not prefixed with `override` when needed, and was not given to the super constructor.
