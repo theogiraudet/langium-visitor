@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.1.4
+## 1.1.4-5
 
-- Remove JS/TS keywords that can be used as parameter names.
+- Remove JS/TS keywords that can be used as parameter names. `as`, `boolean`, `declare`, `get`, `module`, `require`, `number`, `set`, `string`, `symbol`, `type`, `from`, and `of` can now be used.
 
 ## 1.1.3
 
