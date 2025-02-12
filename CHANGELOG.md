@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.4
+
+- Remove JS/TS keywords that can be used as parameter names.
+
 ## 1.1.3
 
 - The Visitor used the Langium interfaces as "visit" methods paramater instead of our custom classes.
