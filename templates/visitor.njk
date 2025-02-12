@@ -4,7 +4,7 @@ import { Reference } from 'langium';
 
 export interface {{ projectName}}Visitor {
     {%- for interface in interfaces %}
-    visit{{ interface.name }}(node : ASTInterfaces.{{ interface.name }}) : any;
+    visit{{ interface.name }}(node : {{ interface.name }}) : any;
     {%- endfor %}
 }
 
