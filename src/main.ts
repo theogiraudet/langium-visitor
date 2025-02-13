@@ -13,6 +13,14 @@ const templatesDir = path.resolve(__dirname, "..", "templates");
 // Reserved typescript keywords
 const keywords = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "implements", "interface", "let", "package", "private", "protected", "public", "static", "yield", "constructor" ]
 
+/**
+ * Generate the visitor files from a Langium grammar
+ * @param outputPath The path to the output directory, where to generate the visitor files. Default to "src/semantics"
+ * @param modulePath The path to the module file, useful to compute relative import. Default to "src/language/{id}-module.ts"
+ * @param grammarPath The path to the grammar.ts file, the source of the generation. Default to "src/language/generated/grammar.ts"
+ * @param astPath The path to the AST file, useful to compute relative import. Default to "src/language/generated/ast.ts"
+ * @param langiumConfigPath The path to the langium-config.json file, to get the project ID and name. Default to "./langium-config.json"
+ */
 export async function generate(outputPath: string = "src/semantics", modulePath?: string, grammarPath?: string, astPath?: string, langiumConfigPath: string = "langium-config.json") {
     const projectInfo = getProjectName(langiumConfigPath);
     if (projectInfo) {
@@ -21,14 +29,26 @@ export async function generate(outputPath: string = "src/semantics", modulePath?
         astPath = astPath || path.join(outputDir, "ast.ts");
         modulePath = modulePath || path.join("src", "language", `${id}-module.ts`);
 
-        const grammar = await parseLangiumGrammar(grammarPath);
-        if(grammar) {
-            const ast = collectAst(grammar);
-            const interfaces = ast.interfaces;
-            const flattened = flattenInterfaces(interfaces);
-            const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
-            generateFiles(outputPath, astPath, modulePath, id, projectName, translated);
-        }       
+        parseLangiumGrammarAndGenerate(outputPath, modulePath, grammarPath, astPath, id, projectName);  
+    }
+}
+
+/**
+ * Generate the visitor files from a Langium grammar
+ * @param outputPath The path to the output directory, where to generate the visitor files
+ * @param modulePath The path to the module file, useful to compute relative import
+ * @param grammarPath The path to the grammar.ts file, the source of the generation
+ * @param astPath The path to the AST file, useful to compute relative import
+ * @param langiumConfigPath The path to the langium-config.json file, to get the project ID and name
+ */
+async function parseLangiumGrammarAndGenerate(outputPath: string, modulePath: string, grammarPath: string, astPath: string, id: string, projectName: string) {
+    const grammar = await parseLangiumGrammar(grammarPath);
+    if(grammar) {
+        const ast = collectAst(grammar);
+        const interfaces = ast.interfaces;
+        const flattened = flattenInterfaces(interfaces);
+        const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
+        generateFiles(outputPath, astPath, modulePath, id, projectName, translated);
     }
 }
 
@@ -37,7 +57,7 @@ export async function generate(outputPath: string = "src/semantics", modulePath?
  * @param grammarPath The path to the grammar file
  * @returns The Langium grammar
  */
-async function parseLangiumGrammar(grammarPath: string): Promise<GrammarAST.Grammar | undefined> {
+export async function parseLangiumGrammar(grammarPath: string): Promise<GrammarAST.Grammar | undefined> {
     let content: string;
     try {
         content = fs.readFileSync(grammarPath, "utf8");
@@ -153,7 +173,7 @@ function translateType(type: PropertyType | undefined): string {
    if(isPrimitiveType(type)) {
         return type.primitive;
     } else if(isStringType(type)) {
-        return type.string;
+        return `'${type.string}'`;
     } else if(isArrayType(type)) {
         return translateType(type.elementType) + '[]';
     } else if(isReferenceType(type)) {
@@ -173,6 +193,7 @@ function translateType(type: PropertyType | undefined): string {
  * Generate the visitor files
  * @param outputDir The path to the output directory
  * @param astDir The path to the AST directory to compute import paths
+ * @param moduleDir The path to the module directory to compute import paths
  * @param projectId The ID of the project
  * @param projectName The name of the project
  * @param interfaces The list of interfaces to generate

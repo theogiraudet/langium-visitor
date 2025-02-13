@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.6
+
+- Fix an issue when the `PropertyType` was a StringType: the generated type was not quoted.
+
 ## 1.1.4-5
 
 - Remove JS/TS keywords that can be used as parameter names. `as`, `boolean`, `declare`, `get`, `module`, `require`, `number`, `set`, `string`, `symbol`, `type`, `from`, and `of` can now be used.
