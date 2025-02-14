@@ -38,14 +38,21 @@ import { <LanguageName>AcceptWeaver, weaveAcceptMethods } from '../semantics/<la
 
 ...
 
-// On your module definition
+// On your the declaration of custom services
+    validation: {
+        <LanguageName>Validator: <LanguageName>Validator
+    }
+
+...
+
+// On your custom module
 validation: {
     <LanguageName>AcceptWeaver: () => new <LanguageName>AcceptWeaver()
 }
 
 ...
 
-// On the create services function
+// On the create services function, just after "shared.ServiceRegistry.register(<LanguageName>);"
 weaveAcceptMethods(<LanguageName>);
 ```
 
@@ -63,3 +70,15 @@ If the main goal of this visitor is to program dynamic semantics, it is recommen
 | `--grammar <path>` | The path to the grammar file | output path specified in the Langium config file + `/grammar.ts` | Yes |
 | `--ast <path>` | The path to the AST file | output path specified in the Langium config file + `/ast.ts` | Yes |
 | `--config <path>` | The path to the Langium config file | `langium-config.json` | Yes |
+
+### How does this work?
+
+The purpose of the accept-weaver is to dynamically add a new method `accept` to the Langium generated (concrete) types.
+These methods are weaved during the validation step of a Langium document.
+However, this method only exists at runtime, so Langium will throw errors when trying to access it.
+To fix this, the generator also creates for each type a class inheriting from it, so with the same properties, but also with an accept method.
+The only other difference is that instead of containing/referencing other Langium's types, they contain/reference the equivalent classes.
+These classes are in the visitor file.
+So by casting a Langium type to its equivalent class (duck-typing), we can statically access the accept method we woven earlier.
+Accept methods are not woven to abstract types.
+We consider any type that doesn't have properties and has subtypes to be an abstract type.

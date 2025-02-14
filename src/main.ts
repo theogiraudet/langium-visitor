@@ -4,7 +4,7 @@ import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface 
 import nunjucks from "nunjucks";
 import path from "path";
 import { fileURLToPath } from "url";
-import { collectAst, InterfaceType, isArrayType, isPrimitiveType, isPropertyUnion, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, PropertyUnion, TypeOption } from "langium/grammar";
+import { collectAst, InterfaceType, isArrayType, isInterfaceType, isPrimitiveType, isPropertyUnion, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, PropertyUnion, TypeOption } from "langium/grammar";
 import chalk from "chalk";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -110,35 +110,33 @@ function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
 /**
  * Flatten a type into a list of interfaces, each interface has the attributes of its parents
  * If the type is a leaf, the resulting interface is marked as concrete
- * @param type_ The type to flatten
+ * @param type The type to flatten
  * @param attributes The attributes of the parents of the current type
  * @param directSuperType The name of the direct super type of the current type
  * @param map The map of already built interfaces
  * @param overrideContainers True if the container types come from a supertype
  * @returns The subtypes name
  */
-function flattenType(type_: TypeOption, attributes: Property[], directSuperType: string | undefined, map: Map<string, FlattenedInterface>, overrideContainers: boolean): string[] {
-    if(!Object.prototype.hasOwnProperty.call(type_, 'properties')) {
-        console.error(chalk.red("Unsupported union type: " + type_.name));
+function flattenType(type: TypeOption, attributes: Property[], directSuperType: string | undefined, map: Map<string, FlattenedInterface>, overrideContainers: boolean): string[] {
+    if(!isInterfaceType(type)) {
+        console.error(chalk.red("Unsupported union type: " + type.name));
         return [];
     }
 
-    const interface_ = type_ as InterfaceType;
-
-    if(map.has(type_.name)) {
+    if(map.has(type.name)) {
         return [];
     }
     
-    const types: string[] = [interface_.name]
+    const types: string[] = [type.name]
     const properties: OverrideProperty[] = attributes.map(attribute => ({ property: attribute, override: true }));
-    interface_.properties.forEach(property => properties.push({ property, override: false }));
+    type.properties.forEach(property => properties.push({ property, override: false }));
 
-    const flattened: FlattenedInterface = { name: interface_.name, properties, isConcrete: interface_.subTypes.size === 0, containerTypes: [...interface_.containerTypes], types: types, directSuperType, overrideContainers: overrideContainers };
-    map.set(interface_.name, flattened);
+    const flattened: FlattenedInterface = { name: type.name, properties, isConcrete: type.subTypes.size === 0, containerTypes: [...type.containerTypes], types: types, directSuperType, overrideContainers: overrideContainers };
+    map.set(type.name, flattened);
 
 
-    if(type_.subTypes.size > 0) {
-        type_.subTypes.forEach(subType => types.push(...flattenType(subType, [...attributes, ...interface_.properties], interface_.name, map, interface_.containerTypes.size > 0)));
+    if(!type.abstract) {
+        type.subTypes.forEach(subType => types.push(...flattenType(subType, [...attributes, ...type.properties], type.name, map, type.containerTypes.size > 0)));
     }
 
     return flattened.types;

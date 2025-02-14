@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.2.0
+
+- Some concrete types were not generated because the generator considers them as abstract classes. The generator know rely on the `abstract` attribute of [PlainInterface](https://github.com/eclipse-langium/langium/blob/77d16cf085d6c57d3cce9386aceb21b19d07ac62/packages/langium/src/grammar/type-system/type-collector/plain-types.ts#L25) to know if a type must be abstract or not.
+
 ## 1.1.6
 
 - Fix an issue when the `PropertyType` was a StringType: the generated type was not quoted.
