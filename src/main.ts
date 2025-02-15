@@ -16,39 +16,36 @@ const keywords = ["break", "case", "catch", "class", "const", "continue", "debug
 /**
  * Generate the visitor files from a Langium grammar
  * @param outputPath The path to the output directory, where to generate the visitor files. Default to "src/semantics"
- * @param modulePath The path to the module file, useful to compute relative import. Default to "src/language/{id}-module.ts"
  * @param grammarPath The path to the grammar.ts file, the source of the generation. Default to "src/language/generated/grammar.ts"
  * @param astPath The path to the AST file, useful to compute relative import. Default to "src/language/generated/ast.ts"
  * @param langiumConfigPath The path to the langium-config.json file, to get the project ID and name. Default to "./langium-config.json"
  */
-export async function generate(outputPath: string = "src/semantics", modulePath?: string, grammarPath?: string, astPath?: string, langiumConfigPath: string = "langium-config.json") {
+export async function generate(outputPath: string = "src/semantics", grammarPath?: string, astPath?: string, langiumConfigPath: string = "langium-config.json") {
     const projectInfo = getProjectName(langiumConfigPath);
     if (projectInfo) {
         const { projectName, id, outputDir } = projectInfo;
         grammarPath = grammarPath || path.join(outputDir, "grammar.ts");
         astPath = astPath || path.join(outputDir, "ast.ts");
-        modulePath = modulePath || path.join("src", "language", `${id}-module.ts`);
 
-        parseLangiumGrammarAndGenerate(outputPath, modulePath, grammarPath, astPath, id, projectName);  
+        parseLangiumGrammarAndGenerate(outputPath, grammarPath, astPath, id, projectName);  
     }
 }
 
 /**
  * Generate the visitor files from a Langium grammar
  * @param outputPath The path to the output directory, where to generate the visitor files
- * @param modulePath The path to the module file, useful to compute relative import
  * @param grammarPath The path to the grammar.ts file, the source of the generation
  * @param astPath The path to the AST file, useful to compute relative import
  * @param langiumConfigPath The path to the langium-config.json file, to get the project ID and name
  */
-async function parseLangiumGrammarAndGenerate(outputPath: string, modulePath: string, grammarPath: string, astPath: string, id: string, projectName: string) {
+async function parseLangiumGrammarAndGenerate(outputPath: string, grammarPath: string, astPath: string, id: string, projectName: string) {
     const grammar = await parseLangiumGrammar(grammarPath);
     if(grammar) {
         const ast = collectAst(grammar);
         const interfaces = ast.interfaces;
         const flattened = flattenInterfaces(interfaces);
         const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
-        generateFiles(outputPath, astPath, modulePath, id, projectName, translated);
+        generateFiles(outputPath, astPath, id, projectName, translated);
     }
 }
 
@@ -191,12 +188,11 @@ function translateType(type: PropertyType | undefined): string {
  * Generate the visitor files
  * @param outputDir The path to the output directory
  * @param astDir The path to the AST directory to compute import paths
- * @param moduleDir The path to the module directory to compute import paths
  * @param projectId The ID of the project
  * @param projectName The name of the project
  * @param interfaces The list of interfaces to generate
  */
-function generateFiles(outputDir: string, astDir: string, moduleDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[]) {
+function generateFiles(outputDir: string, astDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[]) {
     let failed = false;
     // Check if the attribute names are valid Typescript identifiers
     for(const attributes of interfaces.flatMap(interface_ => interface_.attributes)) {
@@ -213,17 +209,12 @@ function generateFiles(outputDir: string, astDir: string, moduleDir: string, pro
 
     nunjucks.configure(templatesDir, { autoescape: false });
     let resolvedImportAst = path.relative(outputDir, astDir).replace(".ts", ".js").replaceAll("\\", "/");
-    let resolvedImportModule = path.relative(outputDir, moduleDir).replace(".ts", ".js").replaceAll("\\", "/");
 
     if(!resolvedImportAst.startsWith(".")) {
         resolvedImportAst = "./" + resolvedImportAst;
     }
-    if(!resolvedImportModule.startsWith(".")) {
-        resolvedImportModule = "./" + resolvedImportModule;
-    }
-    
     const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst });
-    const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete), resolvedImportAst, resolvedImportModule });
+    const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete), resolvedImportAst });
     if(!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir);
     }

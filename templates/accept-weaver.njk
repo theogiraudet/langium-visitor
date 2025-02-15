@@ -1,30 +1,45 @@
-import type { ValidationAcceptor, ValidationChecks } from 'langium';
+import { AstNode, AstUtils, ContextCache, DocumentState, LangiumCoreServices } from 'langium';
 import type { {{ projectName }}AstType } from '{{ resolvedImportAst }}';
 import * as InterfaceAST from '{{ resolvedImportAst }}';
 import * as ClassAST from './{{ projectId }}-visitor.js';
 import { {{ projectName }}Visitor } from './{{ projectId }}-visitor.js';
-import type { {{ projectName }}Services } from '{{ resolvedImportModule }}';
+import { DiagnosticSeverity } from 'vscode-languageserver';
 
-/**
- * Register custom validation checks.
- * TODO : Call this function in the language module.ts file (see registerValidationChecks(...);)
- */
-export function weaveAcceptMethods(services: {{ projectName }}Services) {
-    const registry = services.validation.ValidationRegistry;
-    const weaver = services.validation.{{ projectName }}AcceptWeaver
-    registry.register(weaver.checks, weaver);
+
+type Weaver = {
+    [K in keyof {{ projectName }}AstType]?: (node: {{ projectName }}AstType[K]) => void;
 }
 
 export class {{ projectName }}AcceptWeaver {
     
-    checks: ValidationChecks<{{ projectName }}AstType> = {
+    private readonly checks: Weaver = {
         {%- for interface in interfaces %}
         {{ interface.name }}: this.weave{{ interface.name }}{% if not loop.last %},{% endif %}
         {%- endfor %}
     };
 
+    private readonly cache: ContextCache<AstNode, string, void>;
+
+    constructor(services: LangiumCoreServices) {
+        this.cache = new ContextCache<AstNode, string, void>();
+        services.shared.workspace.DocumentBuilder.onDocumentPhase(DocumentState.Validated, (document) => {
+            if(!document.diagnostics || document.diagnostics.filter(d => d.severity === DiagnosticSeverity.Error).length === 0) {
+                AstUtils.streamAst(document.parseResult.value).forEach((node: AstNode) => {
+                    if(!this.cache.has(node, 'weaved')) {
+                        const nodeType = node.$type as keyof Weaver;
+                        const weaveFunction = this.checks[nodeType]; 
+                        if (weaveFunction) {
+                            weaveFunction(node as any);
+                            this.cache.set(node, 'weaved', undefined);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
     {% for interface in interfaces %}
-    weave{{ interface.name }}(node : InterfaceAST.{{ interface.name }}, accept : ValidationAcceptor) : void {
+    weave{{ interface.name }}(node : InterfaceAST.{{ interface.name }}) : void {
         (<any> node).accept = (visitor: {{ projectName }}Visitor) => { return visitor.visit{{ interface.name }}(node as unknown as ClassAST.{{ interface.name }}); }
     }
     {% endfor %}

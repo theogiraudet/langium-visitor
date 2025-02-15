@@ -34,26 +34,24 @@ To allow your Langium project to use the visitor files, you need to import them 
 For that, you need to add the following lines in your "src/language/<language-id>-module.ts" file:
 
 ```ts
-import { <LanguageName>AcceptWeaver, weaveAcceptMethods } from '../semantics/<language-id>-accept-weaver.js';
+import { <LanguageName>AcceptWeaver } from '../semantics/<language-id>-accept-weaver.js';
 
 ...
 
-// On your the declaration of custom services
-    validation: {
-        <LanguageName>Validator: <LanguageName>Validator
-    }
-
-...
-
-// On your custom module
-validation: {
-    <LanguageName>AcceptWeaver: () => new <LanguageName>AcceptWeaver()
+export type <LanguageName>AddedServices = {
+    <LanguageName>AcceptWeaver: <LanguageName>AcceptWeaver
 }
 
 ...
 
+export const <LanguageName>Module: Module<<LanguageName>Services, PartialLangiumServices & <LanguageName>AddedServices> = {
+    <LanguageName>AcceptWeaver: (services) => new <LanguageName>AcceptWeaver(services)
+};
+
+...
+
 // On the create services function, just after "shared.ServiceRegistry.register(<LanguageName>);"
-weaveAcceptMethods(<LanguageName>);
+HelloWorld.HelloWorldAcceptWeaver; // This is to instantiate the accept weaver
 ```
 
 ### Create a new concrete Visitor
@@ -66,7 +64,6 @@ If the main goal of this visitor is to program dynamic semantics, it is recommen
 | Argument | Description | Default Value | Optional |
 | -------- | ----------- | ------------- | -------- |
 | `--out <path>` | The output directory for the generated files | `src/semantics` | Yes |
-| `--module <path>` | The path to the module file | `src/language/<language-id>-module.ts` | Yes |
 | `--grammar <path>` | The path to the grammar file | output path specified in the Langium config file + `/grammar.ts` | Yes |
 | `--ast <path>` | The path to the AST file | output path specified in the Langium config file + `/ast.ts` | Yes |
 | `--config <path>` | The path to the Langium config file | `langium-config.json` | Yes |
@@ -74,7 +71,7 @@ If the main goal of this visitor is to program dynamic semantics, it is recommen
 ### How does this work?
 
 The purpose of the accept-weaver is to dynamically add a new method `accept` to the Langium generated (concrete) types.
-These methods are weaved during the validation step of a Langium document.
+The weaver is executed when each time a Langium document goes in "Validated" state, but use a cache to avoid reweaving the same AST nodes multiple times.
 However, this method only exists at runtime, so Langium will throw errors when trying to access it.
 To fix this, the generator also creates for each type a class inheriting from it, so with the same properties, but also with an accept method.
 The only other difference is that instead of containing/referencing other Langium's types, they contain/reference the equivalent classes.
