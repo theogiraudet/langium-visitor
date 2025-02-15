@@ -18,3 +18,8 @@ export type FlattenedInterface = {
 export type FlattenedTranslatedInterface = { types: string[], name: string, attributes: TranslatedAttribute[], directSuperType: string | undefined, isConcrete: boolean, containerTypes: string[], overrideContainers: boolean }
 
 export type TranslatedAttribute = { name: string, type: string, override: boolean }
+
+export type TranslatedTypeOption = {
+    name: string,
+    types: string
+}

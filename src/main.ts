@@ -1,10 +1,10 @@
 import fs from "fs";
-import { GrammarAST, loadGrammarFromJson } from "langium";
-import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface as FlattenedTranslatedInterface, OverrideProperty } from "./types.js";
+import { GrammarAST, GrammarUtils, loadGrammarFromJson } from "langium";
+import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface as FlattenedTranslatedInterface, OverrideProperty, TranslatedTypeOption } from "./types.js";
 import nunjucks from "nunjucks";
 import path from "path";
 import { fileURLToPath } from "url";
-import { collectAst, InterfaceType, isArrayType, isInterfaceType, isPrimitiveType, isPropertyUnion, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, PropertyUnion, TypeOption } from "langium/grammar";
+import { collectAst, InterfaceType, isArrayType, isInterfaceType, isPrimitiveType, isPropertyUnion, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, PropertyUnion, TypeOption, UnionType } from "langium/grammar";
 import chalk from "chalk";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43,10 +43,30 @@ async function parseLangiumGrammarAndGenerate(outputPath: string, grammarPath: s
     if(grammar) {
         const ast = collectAst(grammar);
         const interfaces = ast.interfaces;
+        const unions = ast.unions.map(union => ({ name: union.name, types: translateTypeOption(union) }));
+        const rootType = getRootType(grammar);
+        if(!rootType) {
+            console.error(chalk.red("No entry rule found in the grammar"));
+            return;
+        }
         const flattened = flattenInterfaces(interfaces);
         const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
-        generateFiles(outputPath, astPath, id, projectName, translated);
+        generateFiles(outputPath, astPath, id, projectName, translated, rootType, unions);
     }
+}
+
+
+/**
+ * Get the type of the entry rule of the grammar
+ * @param grammar The grammar
+ * @returns The type of the entry rule of the grammar
+ */
+export function getRootType(grammar: GrammarAST.Grammar): string | undefined {
+    const entryRule = GrammarUtils.getEntryRule(grammar);
+    if(!entryRule) {
+        return undefined;
+    }
+    return GrammarUtils.getRuleTypeName(entryRule);
 }
 
 /**
@@ -106,7 +126,6 @@ function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
 
 /**
  * Flatten a type into a list of interfaces, each interface has the attributes of its parents
- * If the type is a leaf, the resulting interface is marked as concrete
  * @param type The type to flatten
  * @param attributes The attributes of the parents of the current type
  * @param directSuperType The name of the direct super type of the current type
@@ -119,7 +138,7 @@ function flattenType(type: TypeOption, attributes: Property[], directSuperType: 
         console.error(chalk.red("Unsupported union type: " + type.name));
         return [];
     }
-
+    
     if(map.has(type.name)) {
         return [];
     }
@@ -173,14 +192,25 @@ function translateType(type: PropertyType | undefined): string {
         return translateType(type.elementType) + '[]';
     } else if(isReferenceType(type)) {
         return "Reference<" + translateType(type.referenceType) + ">";
-    } else if(isValueType(type) && isUnionType(type.value)) {
-        return "ASTInterfaces." + type.value.name;
     } else if(isValueType(type)) {
         return type.value.name;
     } else if(isPropertyUnion(type)) {
         return type.types.map(type => translateType(type)).join(" | ");
     }
     return '';
+}
+
+/**
+ * Translate a type option into a string
+ * @param type The type option to translate
+ * @returns The translated type option
+ */
+function translateTypeOption(type: TypeOption): string {
+    if(isInterfaceType(type)) {
+        return type.name;
+    } else {
+        return translateType(type.type);
+    }
 }
 
 
@@ -191,8 +221,10 @@ function translateType(type: PropertyType | undefined): string {
  * @param projectId The ID of the project
  * @param projectName The name of the project
  * @param interfaces The list of interfaces to generate
+ * @param rootType The type of the entry rule of the grammar
+ * @param unions The list of unions to generate
  */
-function generateFiles(outputDir: string, astDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[]) {
+function generateFiles(outputDir: string, astDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[], rootType: string, unions: TranslatedTypeOption[]) {
     let failed = false;
     // Check if the attribute names are valid Typescript identifiers
     for(const attributes of interfaces.flatMap(interface_ => interface_.attributes)) {
@@ -213,7 +245,7 @@ function generateFiles(outputDir: string, astDir: string, projectId: string, pro
     if(!resolvedImportAst.startsWith(".")) {
         resolvedImportAst = "./" + resolvedImportAst;
     }
-    const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst });
+    const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst, rootType, unions });
     const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete), resolvedImportAst });
     if(!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir);
