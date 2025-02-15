@@ -1,6 +1,9 @@
 # Langium Visitor
 
 A CLI tool to generate visitor classes for a Langium project.
+The generator will generate two different abstract visitors:
+- Visitor: A visitor that can visit all the nodes of the AST.
+- ValidationVisitor: A visitor enabling Langium validation.
 
 ## Installation
 
@@ -35,29 +38,46 @@ For that, you need to add the following lines in your "src/language/<language-id
 
 ```ts
 import { <LanguageName>AcceptWeaver } from '../semantics/<language-id>-accept-weaver.js';
+import { <LanguageName>CustomVisitor } from './your/path/language-id-visitor.ts';
+import { <LanguageName>CustomValidationVisitor } from './your/path/language-id-custom-validation-visitor.ts';
+import { registerVisitorAsValidator } from '../semantics/<language-id>-visitor.js';
 
 ...
 
 export type <LanguageName>AddedServices = {
-    <LanguageName>AcceptWeaver: <LanguageName>AcceptWeaver
+    visitors: {
+      <LanguageName>AcceptWeaver: <LanguageName>AcceptWeaver
+      <LanguageName>CustomVisitor: <LanguageName>CustomVisitor
+      <LanguageName>CustomValidationVisitor: <LanguageName>CustomValidationVisitor
+    }
 }
 
 ...
 
 export const <LanguageName>Module: Module<<LanguageName>Services, PartialLangiumServices & <LanguageName>AddedServices> = {
-    <LanguageName>AcceptWeaver: (services) => new <LanguageName>AcceptWeaver(services)
+    visitors: {
+      <LanguageName>AcceptWeaver: (services) => new <LanguageName>AcceptWeaver(services)
+      <LanguageName>CustomVisitor: () => new <LanguageName>CustomVisitor()
+      <LanguageName>CustomValidationVisitor: () => new <LanguageName>CustomValidationVisitor()
+    }
 };
 
 ...
 
 // On the create services function, just after "shared.ServiceRegistry.register(<LanguageName>);"
 HelloWorld.HelloWorldAcceptWeaver; // This is to instantiate the accept weaver
+registerVisitorAsValidator(HelloWorld.visitors.HelloWorldTypeChecker, HelloWorld); // This is to register the validation visitor to the validation registry of Langium
 ```
+
+The instantiation and registration of the validation is done by the `registerVisitorAsValidator` function.
+For basic visitors, you have to do it manually by calling `<LanguageName>Module.visitors.<LanguageName>CustomVisitor` where you want to use the visitor.
 
 ### Create a new concrete Visitor
 
-To create a new concrete Visitor, you just need to create a new class that implements the `Visitor` interface.
+To create a new concrete Visitor, you just need to create a new class that implements the `Visitor` interface or extends the `ValidationVisitor` abstract class.
 If the main goal of this visitor is to program dynamic semantics, it is recommended to place your concrete visitor in the `src/cli` directory to follow Langium's convention.
+The ValidationVisitor provides a protected `validationAccept` function that can be used to accept an ASTNode, as in the [default Langium validator](https://langium.org/docs/learn/workflow/create_validations/).
+An example can be found in the `examples` directory.
 
 ### CLI Arguments
 

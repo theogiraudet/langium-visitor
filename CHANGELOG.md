@@ -5,6 +5,9 @@
 - Some concrete types were not generated because the generator considers them as abstract classes. The generator now rely on the `abstract` attribute of [PlainInterface](https://github.com/eclipse-langium/langium/blob/77d16cf085d6c57d3cce9386aceb21b19d07ac62/packages/langium/src/grammar/type-system/type-collector/plain-types.ts#L25) to know if a type must be abstract or not.
 - The weaver does not rely on Langium validator anymore. It is now directly executed when a Langium document goes in "Validated" state. To avoid reweaving the same AST nodes multiple times, the weaver uses a cache.
 - Thanks to that, the `module` CLI argument is no longer needed and has been removed.
+- Add a new abstract class `AbstractValidationVisitor` that can be used to implement a validation visitor. It uses the Langium validator service under the hood and exposes its `accept` method.
+- The generator is now able to generate equivalent union types coming from the original grammar but using the visitor classes instead of the Langium interfaces. Thanks to that, no types/interfaces from the `ast.ts` file are needed anymore in the signature of the visitor classes.
+- Add a new example project to showcase the usage of the visitor pattern.
 
 
 ## 1.1.6

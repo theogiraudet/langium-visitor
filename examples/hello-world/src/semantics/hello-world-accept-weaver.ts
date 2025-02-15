@@ -4,27 +4,27 @@
  ******************************************************************************/
 
 import { AstNode, AstUtils, ContextCache, DocumentState, LangiumCoreServices } from 'langium';
-import type { {{ projectName }}AstType } from '{{ resolvedImportAst }}';
-import * as InterfaceAST from '{{ resolvedImportAst }}';
-import * as ClassAST from './{{ projectId }}-visitor.js';
-import { {{ projectName }}Visitor } from './{{ projectId }}-visitor.js';
+import type { HelloWorldAstType } from '../language/generated/ast.js';
+import * as InterfaceAST from '../language/generated/ast.js';
+import * as ClassAST from './hello-world-visitor.js';
+import { HelloWorldVisitor } from './hello-world-visitor.js';
 import { DiagnosticSeverity } from 'vscode-languageserver';
 
 
 type Weaver = {
-    [K in keyof {{ projectName }}AstType]?: (node: {{ projectName }}AstType[K]) => void;
+    [K in keyof HelloWorldAstType]?: (node: HelloWorldAstType[K]) => void;
 }
 
 /**
  * This class is used to dynamically add an `accept` method to the Langium generated (concrete) types.
  * It is executed when each time a Langium document goes in "IndexedReferences" state, before the validation phase, but use a cache to avoid reweaving the same AST nodes multiple times.
  */
-export class {{ projectName }}AcceptWeaver {
+export class HelloWorldAcceptWeaver {
     
     private readonly checks: Weaver = {
-        {%- for interface in interfaces %}
-        {{ interface.name }}: this.weave{{ interface.name }}{% if not loop.last %},{% endif %}
-        {%- endfor %}
+        Greeting: this.weaveGreeting,
+        Model: this.weaveModel,
+        Person: this.weavePerson
     };
 
     private readonly cache: ContextCache<AstNode, string, void>;
@@ -47,9 +47,17 @@ export class {{ projectName }}AcceptWeaver {
         });
     }
 
-    {% for interface in interfaces %}
-    weave{{ interface.name }}(node : InterfaceAST.{{ interface.name }}) : void {
-        (<any> node).accept = (visitor: {{ projectName }}Visitor) => { return visitor.visit{{ interface.name }}(node as unknown as ClassAST.{{ interface.name }}); }
+    
+    weaveGreeting(node : InterfaceAST.Greeting) : void {
+        (<any> node).accept = (visitor: HelloWorldVisitor) => { return visitor.visitGreeting(node as unknown as ClassAST.Greeting); }
     }
-    {% endfor %}
+    
+    weaveModel(node : InterfaceAST.Model) : void {
+        (<any> node).accept = (visitor: HelloWorldVisitor) => { return visitor.visitModel(node as unknown as ClassAST.Model); }
+    }
+    
+    weavePerson(node : InterfaceAST.Person) : void {
+        (<any> node).accept = (visitor: HelloWorldVisitor) => { return visitor.visitPerson(node as unknown as ClassAST.Person); }
+    }
+    
 }

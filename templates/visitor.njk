@@ -6,12 +6,20 @@
 import * as ASTInterfaces from '{{ resolvedImportAst }}';
 import { LangiumCoreServices, Reference, ValidationAcceptor, ValidationChecks } from 'langium';
 
+/**
+ * This interface is used to define the visitor methods for the {{ projectName }} language.
+ */
 export interface {{ projectName}}Visitor {
     {%- for interface in interfaces %}
     visit{{ interface.name }}(node : {{ interface.name }}) : any;
     {%- endfor %}
 }
 
+/**
+ * This abstract class is used to implement a validation visitor for the {{ projectName }} language.
+ * It uses the Langium validator service under the hood and exposes its `accept` method through the `validationAccept` property.
+ * This `validationAccept` property is reassigned each time the `visitRoot` method is called, so when Langium called the different validation checks.
+ */
 export abstract class {{ projectName }}ValidationVisitor {
 
     protected validationAccept: ValidationAcceptor = () => {};
@@ -26,7 +34,12 @@ export abstract class {{ projectName }}ValidationVisitor {
 }
 
 
-
+/**
+ * This function is used to register a validation visitor for the {{ projectName }} language.
+ * It will register the `visitRoot` method as a validation check for the {{ rootType }} type.
+ * @param visitor - The visitor to register.
+ * @param services - The Langium services.
+ */
 export function registerVisitorAsValidator<T extends {{ projectName }}ValidationVisitor>(visitor: T, services: LangiumCoreServices) {
     const registry = services.validation.ValidationRegistry;
     const checks: ValidationChecks<ASTInterfaces.{{ projectName }}AstType> = {
@@ -38,7 +51,10 @@ export function registerVisitorAsValidator<T extends {{ projectName }}Validation
 }
 
 
-
+/* Each concrete interfaces in the `ast.js` file have an equivalent generated class with the same properties but also with an `accept` method.
+ * While the generated accept-weaver allows us to dynamically add the `accept` function to Langium's types, these classes allow it to exist statically, so we can take advantage of TypeScript's typing.
+ * Nevertheless, the two are strictly equivalent, and conversion from one to the other is made possible thanks to duck-typing.
+ */
 {% for interface in interfaces %}
 export class {{ interface.name }} {% if interface.directSuperType %}extends {{ interface.directSuperType }} {% endif %}implements ASTInterfaces.{{ interface.name }} {
     
@@ -57,6 +73,14 @@ export class {{ interface.name }} {% if interface.directSuperType %}extends {{ i
     }
 }
 {% endfor %}
+{%- if unions.length > 0 %}
+
+/*
+ * Each union type in the `ast.js` file have an equivalent generated type but using the visitor classes instead of the Langium interfaces/types.
+ * This type is used to propose the `accept` method of their generated classes.
+ */
+
 {% for union in unions %}
 export type {{ union.name }} = {{ union.types }};
 {% endfor %}
+{%- endif %}
