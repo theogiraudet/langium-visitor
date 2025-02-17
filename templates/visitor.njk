@@ -4,7 +4,7 @@
  ******************************************************************************/
 
 import * as ASTInterfaces from '{{ resolvedImportAst }}';
-import { LangiumCoreServices, Reference, ValidationAcceptor, ValidationChecks } from 'langium';
+import { LangiumCoreServices, {% if hasAnyReference %}Reference, {% endif %}ValidationAcceptor, ValidationChecks } from 'langium';
 
 /**
  * This interface is used to define the visitor methods for the {{ projectName }} language.
@@ -51,35 +51,37 @@ export function registerVisitorAsValidator<T extends {{ projectName }}Validation
 }
 
 
-/* Each concrete interfaces in the `ast.js` file have an equivalent generated class with the same properties but also with an `accept` method.
- * While the generated accept-weaver allows us to dynamically add the `accept` function to Langium's types, these classes allow it to exist statically, so we can take advantage of TypeScript's typing.
+/* Each concrete interfaces in the `ast.js` file have an equivalent generated type with the same properties but also with an `accept` method.
+ * While the generated accept-weaver allows us to dynamically add the `accept` function to Langium's types, these types allow it to exist statically, so we can take advantage of TypeScript's typing.
+ * The references are overrided to use the visitor types instead of the Langium interfaces/types.
  * Nevertheless, the two are strictly equivalent, and conversion from one to the other is made possible thanks to duck-typing.
  */
+
+type Acceptor = {
+    accept: (visitor: {{ projectName }}Visitor) => any;
+}
+
+function isAcceptor(node: unknown): node is Acceptor {
+    return typeof (node as any).accept === 'function';
+}
 {% for interface in interfaces %}
-export class {{ interface.name }} {% if interface.directSuperType %}extends {{ interface.directSuperType }} {% endif %}implements ASTInterfaces.{{ interface.name }} {
-    
-    constructor(public{% if interface.directSuperType %} override{% endif %} $type: {% for type in interface.types %}'{{ type }}'{% if not loop.last %} | {% endif %}{% endfor -%}
-    {% if interface.containerTypes.length > 0 %}, public{% if interface.overrideContainers %} override{% endif %} $container: {% for superType in interface.containerTypes %}{{ superType }}{% if not loop.last %} | {% endif %}{% endfor %}{% endif -%}
-    {% if interface.attributes.length > 0 %}, {% for attribute in interface.attributes %}public{% if attribute.override %} override{% endif %} {{ attribute.name }}: {{ attribute.type }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}) {
-        {%- if interface.directSuperType %}
-        super($type{% if interface.attributes.length > 0 %}{% if interface.overrideContainers %}, $container{% endif %}{% for attribute in interface.attributes %}{% if attribute.override %}, {{ attribute.name }}{% endif %}{% endfor %}{% endif %});
-        {%- endif %}
-    }
-    
-    {% if interface.directSuperType %}override{% endif %} accept(visitor: {{ projectName }}Visitor) : any {
-        {%- if interface.isConcrete %}
-        return visitor.visit{{ interface.name }}(this);
-        {%- endif %}
-    }
+export type {{ interface.name }} = Acceptor & {% if interface.references.length > 0 %}Omit<ASTInterfaces.{{ interface.name }}, {% for reference in interface.references %}'{{ reference.name }}'{% if not loop.last %} | {% endif %}{% endfor %}>{% else %}ASTInterfaces.{{ interface.name }}{% endif %}{% if interface.references.length > 0 %} & {
+{%- for reference in interface.references %}
+    {{ reference.name }}: {{ reference.type }};
+{%- endfor %}
+}
+{%- endif %}
+
+export function is{{ interface.name }}(node: unknown): node is {{ interface.name }} {
+    return ASTInterfaces.is{{ interface.name }}(node) && isAcceptor(node);
 }
 {% endfor %}
-{%- if unions.length > 0 %}
 
+{%- if unions.length > 0 %}
 /*
  * Each union type in the `ast.js` file have an equivalent generated type but using the visitor classes instead of the Langium interfaces/types.
  * This type is used to propose the `accept` method of their generated classes.
  */
-
 {% for union in unions %}
 export type {{ union.name }} = {{ union.types }};
 {% endfor %}

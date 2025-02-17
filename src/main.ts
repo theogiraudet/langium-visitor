@@ -1,6 +1,6 @@
 import fs from "fs";
 import { GrammarAST, GrammarUtils, loadGrammarFromJson } from "langium";
-import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface as FlattenedTranslatedInterface, OverrideProperty, TranslatedTypeOption } from "./types.js";
+import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface as FlattenedTranslatedInterface, OverrideProperty, TranslatedAttribute, TranslatedTypeOption } from "./types.js";
 import nunjucks from "nunjucks";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -9,9 +9,6 @@ import chalk from "chalk";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const templatesDir = path.resolve(__dirname, "..", "templates");
-
-// Reserved typescript keywords
-const keywords = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "implements", "interface", "let", "package", "private", "protected", "public", "static", "yield", "constructor" ]
 
 /**
  * Generate the visitor files from a Langium grammar
@@ -120,7 +117,7 @@ function getProjectName(langiumConfigPath: string): { projectName: string, id: s
  */
 function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
     const map = new Map<string, FlattenedInterface>();
-    interfaces.forEach(interface_ => flattenType(interface_, [], undefined, map, false));
+    interfaces.forEach(interface_ => flattenType(interface_, [], map ));
     return Array.from(map.values());
 }
 
@@ -128,12 +125,10 @@ function flattenInterfaces(interfaces: InterfaceType[]): FlattenedInterface[] {
  * Flatten a type into a list of interfaces, each interface has the attributes of its parents
  * @param type The type to flatten
  * @param attributes The attributes of the parents of the current type
- * @param directSuperType The name of the direct super type of the current type
  * @param map The map of already built interfaces
- * @param overrideContainers True if the container types come from a supertype
  * @returns The subtypes name
  */
-function flattenType(type: TypeOption, attributes: Property[], directSuperType: string | undefined, map: Map<string, FlattenedInterface>, overrideContainers: boolean): string[] {
+function flattenType(type: TypeOption, attributes: Property[], map: Map<string, FlattenedInterface>): string[] {
     if(!isInterfaceType(type)) {
         console.error(chalk.red("Unsupported union type: " + type.name));
         return [];
@@ -147,12 +142,12 @@ function flattenType(type: TypeOption, attributes: Property[], directSuperType: 
     const properties: OverrideProperty[] = attributes.map(attribute => ({ property: attribute, override: true }));
     type.properties.forEach(property => properties.push({ property, override: false }));
 
-    const flattened: FlattenedInterface = { name: type.name, properties, isConcrete: type.subTypes.size === 0, containerTypes: [...type.containerTypes], types: types, directSuperType, overrideContainers: overrideContainers };
+    const flattened: FlattenedInterface = { name: type.name, properties, isConcrete: type.subTypes.size === 0, containerTypes: [...type.containerTypes], types: types };
     map.set(type.name, flattened);
 
 
     if(!type.abstract) {
-        type.subTypes.forEach(subType => types.push(...flattenType(subType, [...attributes, ...type.properties], type.name, map, type.containerTypes.size > 0)));
+        type.subTypes.forEach(subType => types.push(...flattenType(subType, [...attributes, ...type.properties], map)));
     }
 
     return flattened.types;
@@ -165,11 +160,18 @@ function flattenType(type: TypeOption, attributes: Property[], directSuperType: 
  * @returns The translated interface
  */
 function translateFlattenedInterface(interface_: FlattenedInterface): FlattenedTranslatedInterface {
-    const superTypes = interface_.containerTypes.map(superType => superType.name);
-    const translated: FlattenedTranslatedInterface = { name: interface_.name, attributes: [], isConcrete: interface_.isConcrete, containerTypes: superTypes, types: interface_.types, directSuperType: interface_.directSuperType, overrideContainers: interface_.overrideContainers };
-    for(const property of interface_.properties) {
-        translated.attributes.push({ name: property.property.name, type: translateType(property.property.type), override: property.override });
+    const references: TranslatedAttribute[] = [];
+    const containerTypes = interface_.containerTypes.map(superType => superType.name);
+    if(containerTypes.length > 0) {
+        references.push({ name: "$container", type: containerTypes.join(" | "), isReference: true });
     }
+    for(const property of interface_.properties) {
+        const [type, isReference] = translateType(property.property.type);
+        if(isReference) {
+            references.push({ name: property.property.name, type, isReference: true });
+        }
+    }
+    const translated: FlattenedTranslatedInterface = { name: interface_.name, references, isConcrete: interface_.isConcrete, containerTypes: containerTypes, types: interface_.types };
     return translated;
 }
 
@@ -178,26 +180,32 @@ function translateFlattenedInterface(interface_: FlattenedInterface): FlattenedT
  * @param type The type to translate
  * @returns The translated type
  */
-function translateType(type: PropertyType | undefined): string {
+function translateType(type: PropertyType | undefined): [string, boolean] {
     if(!type) {
         console.error(chalk.red("Unknown type"));
-        return "unknown";
+        return ["unknown", false];
     }
 
    if(isPrimitiveType(type)) {
-        return type.primitive;
+        return [type.primitive, false];
     } else if(isStringType(type)) {
-        return `'${type.string}'`;
+        return [`'${type.string}'`, false];
     } else if(isArrayType(type)) {
-        return translateType(type.elementType) + '[]';
+        const [elementType, isReference] = translateType(type.elementType);
+        return [elementType + '[]', isReference];
     } else if(isReferenceType(type)) {
-        return "Reference<" + translateType(type.referenceType) + ">";
+        const [referenceType, isReference] = translateType(type.referenceType);
+        return ["Reference<" + referenceType + ">", isReference];
     } else if(isValueType(type)) {
-        return type.value.name;
+        return [type.value.name, true];
     } else if(isPropertyUnion(type)) {
-        return type.types.map(type => translateType(type)).join(" | ");
+        const types = type.types.map(type => translateType(type)).reduce((acc, current) => {
+            acc[0].push(current[0]);
+            return [acc[0], acc[1] || current[1]] as [string[], boolean];
+        }, [[], false] as [string[], boolean]);
+        return [types[0].join(" | "), types[1]];
     }
-    return '';
+    return ['unknown', false];
 }
 
 /**
@@ -209,10 +217,9 @@ function translateTypeOption(type: TypeOption): string {
     if(isInterfaceType(type)) {
         return type.name;
     } else {
-        return translateType(type.type);
+        return translateType(type.type)[0];
     }
 }
-
 
 /**
  * Generate the visitor files
@@ -225,27 +232,16 @@ function translateTypeOption(type: TypeOption): string {
  * @param unions The list of unions to generate
  */
 function generateFiles(outputDir: string, astDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[], rootType: string, unions: TranslatedTypeOption[]) {
-    let failed = false;
-    // Check if the attribute names are valid Typescript identifiers
-    for(const attributes of interfaces.flatMap(interface_ => interface_.attributes)) {
-        if(keywords.includes(attributes.name)) {
-            console.error(chalk.red(`Reserved keyword ${attributes.name} cannot be used as an attribute name.`));
-            failed = true;
-        }
-    }
-
-    if(failed) {
-        console.error(chalk.red("Failed to generate files."));
-        return;
-    }
-
     nunjucks.configure(templatesDir, { autoescape: false });
     let resolvedImportAst = path.relative(outputDir, astDir).replace(".ts", ".js").replaceAll("\\", "/");
 
     if(!resolvedImportAst.startsWith(".")) {
         resolvedImportAst = "./" + resolvedImportAst;
     }
-    const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst, rootType, unions });
+
+    const hasAnyReference = interfaces.some(interface_ => interface_.references.length > 0);
+
+    const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst, rootType, unions, hasAnyReference });
     const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete), resolvedImportAst });
     if(!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir);
