@@ -192,7 +192,7 @@ function translateType(type: PropertyType | undefined): [string, boolean] {
         return [`'${type.string}'`, false];
     } else if(isArrayType(type)) {
         const [elementType, isReference] = translateType(type.elementType);
-        return [elementType + '[]', isReference];
+        return ['Array<' + elementType + '>', isReference];
     } else if(isReferenceType(type)) {
         const [referenceType, isReference] = translateType(type.referenceType);
         return ["Reference<" + referenceType + ">", isReference];

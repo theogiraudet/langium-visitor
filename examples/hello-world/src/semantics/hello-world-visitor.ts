@@ -52,37 +52,46 @@ export function registerVisitorAsValidator<T extends HelloWorldValidationVisitor
 }
 
 
-/* Each concrete interfaces in the `ast.js` file have an equivalent generated class with the same properties but also with an `accept` method.
- * While the generated accept-weaver allows us to dynamically add the `accept` function to Langium's types, these classes allow it to exist statically, so we can take advantage of TypeScript's typing.
+/* Each concrete interfaces in the `ast.js` file have an equivalent generated type with the same properties but also with an `accept` method.
+ * While the generated accept-weaver allows us to dynamically add the `accept` function to Langium's types, these types allow it to exist statically, so we can take advantage of TypeScript's typing.
+ * The references are overrided to use the visitor types instead of the Langium interfaces/types.
  * Nevertheless, the two are strictly equivalent, and conversion from one to the other is made possible thanks to duck-typing.
  */
 
-export class Greeting implements ASTInterfaces.Greeting {
-    
-    constructor(public $type: 'Greeting', public $container: Model, public person: Reference<Person>) {
-    }
-    
-     accept(visitor: HelloWorldVisitor) : any {
-        return visitor.visitGreeting(this);
-    }
+type Acceptor = {
+    accept: (visitor: HelloWorldVisitor) => any;
 }
 
-export class Model implements ASTInterfaces.Model {
-    
-    constructor(public $type: 'Model', public persons: Person[], public greetings: Greeting[]) {
-    }
-    
-     accept(visitor: HelloWorldVisitor) : any {
-        return visitor.visitModel(this);
-    }
+function isAcceptor(node: unknown): node is Acceptor {
+    return typeof (node as any).accept === 'function';
 }
 
-export class Person implements ASTInterfaces.Person {
-    
-    constructor(public $type: 'Person', public $container: Model, public name: string) {
-    }
-    
-     accept(visitor: HelloWorldVisitor) : any {
-        return visitor.visitPerson(this);
-    }
+
+export type Greeting = Acceptor & Omit<ASTInterfaces.Greeting, '$container' | 'person'> & {
+    $container: Model;
+    person: Reference<Person>;
 }
+
+export function isGreeting(node: unknown): node is Greeting {
+    return ASTInterfaces.isGreeting(node) && isAcceptor(node);
+}
+
+
+export type Model = Acceptor & Omit<ASTInterfaces.Model, 'persons' | 'greetings'> & {
+    persons: Array<Person>;
+    greetings: Array<Greeting>;
+}
+
+export function isModel(node: unknown): node is Model {
+    return ASTInterfaces.isModel(node) && isAcceptor(node);
+}
+
+
+export type Person = Acceptor & Omit<ASTInterfaces.Person, '$container'> & {
+    $container: Model;
+}
+
+export function isPerson(node: unknown): node is Person {
+    return ASTInterfaces.isPerson(node) && isAcceptor(node);
+}
+

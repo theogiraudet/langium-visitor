@@ -64,6 +64,7 @@ type Acceptor = {
 function isAcceptor(node: unknown): node is Acceptor {
     return typeof (node as any).accept === 'function';
 }
+
 {% for interface in interfaces %}
 export type {{ interface.name }} = Acceptor & {% if interface.references.length > 0 %}Omit<ASTInterfaces.{{ interface.name }}, {% for reference in interface.references %}'{{ reference.name }}'{% if not loop.last %} | {% endif %}{% endfor %}>{% else %}ASTInterfaces.{{ interface.name }}{% endif %}{% if interface.references.length > 0 %} & {
 {%- for reference in interface.references %}
@@ -75,6 +76,7 @@ export type {{ interface.name }} = Acceptor & {% if interface.references.length 
 export function is{{ interface.name }}(node: unknown): node is {{ interface.name }} {
     return ASTInterfaces.is{{ interface.name }}(node) && isAcceptor(node);
 }
+
 {% endfor %}
 
 {%- if unions.length > 0 %}
