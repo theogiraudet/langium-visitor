@@ -38,6 +38,8 @@ export abstract class HelloWorldValidationVisitor {
 /**
  * This function is used to register a validation visitor for the HelloWorld language.
  * It will register the `visitRoot` method as a validation check for the Model type.
+ * @param visitor - The visitor to register.
+ * @param services - The Langium services.
  */
 export function registerVisitorAsValidator<T extends HelloWorldValidationVisitor>(visitor: T, services: LangiumCoreServices) {
     const registry = services.validation.ValidationRegistry;
