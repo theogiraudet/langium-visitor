@@ -54,5 +54,9 @@
   "bugs": {
     "url": "https://github.com/theogiraudet/langium-visitor/issues"
   },
-  "homepage": "https://github.com/theogiraudet/langium-visitor#readme"
+  "homepage": "https://github.com/theogiraudet/langium-visitor#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theogiraudet/langium-visitor"
+  }
 }
