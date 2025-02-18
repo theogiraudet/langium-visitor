@@ -4,7 +4,7 @@ import { FlattenedInterface as FlattenedInterface, FlattenedTranslatedInterface 
 import nunjucks from "nunjucks";
 import path from "path";
 import { fileURLToPath } from "url";
-import { collectAst, InterfaceType, isArrayType, isInterfaceType, isPrimitiveType, isPropertyUnion, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, PropertyUnion, TypeOption, UnionType } from "langium/grammar";
+import { AstTypes, collectAst, InterfaceType, isArrayType, isInterfaceType, isPrimitiveType, isPropertyUnion, isReferenceType, isStringType, isUnionType, isValueType, Property, PropertyType, PropertyUnion, TypeOption, UnionType } from "langium/grammar";
 import chalk from "chalk";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -17,39 +17,62 @@ const templatesDir = path.resolve(__dirname, "..", "templates");
  * @param astPath The path to the AST file, useful to compute relative import. Default to "src/language/generated/ast.ts"
  * @param langiumConfigPath The path to the langium-config.json file, to get the project ID and name. Default to "./langium-config.json"
  */
-export async function generate(outputPath: string = "src/semantics", grammarPath?: string, astPath?: string, langiumConfigPath: string = "langium-config.json") {
+export async function generateFromCli(outputPath: string = "src/semantics", grammarPath?: string, astPath?: string, langiumConfigPath: string = "langium-config.json") {
     const projectInfo = getProjectName(langiumConfigPath);
     if (projectInfo) {
         const { projectName, id, outputDir } = projectInfo;
         grammarPath = grammarPath || path.join(outputDir, "grammar.ts");
         astPath = astPath || path.join(outputDir, "ast.ts");
 
-        parseLangiumGrammarAndGenerate(outputPath, grammarPath, astPath, id, projectName);  
+        parseAndGenerate(outputPath, grammarPath, astPath, id, projectName);  
     }
 }
 
 /**
- * Generate the visitor files from a Langium grammar
+ * Generate the visitor files from a Langium grammar to parse
  * @param outputPath The path to the output directory, where to generate the visitor files
  * @param grammarPath The path to the grammar.ts file, the source of the generation
  * @param astPath The path to the AST file, useful to compute relative import
  * @param langiumConfigPath The path to the langium-config.json file, to get the project ID and name
  */
-async function parseLangiumGrammarAndGenerate(outputPath: string, grammarPath: string, astPath: string, id: string, projectName: string) {
+async function parseAndGenerate(outputPath: string, grammarPath: string, astPath: string, id: string, projectName: string) {
     const grammar = await parseLangiumGrammar(grammarPath);
     if(grammar) {
-        const ast = collectAst(grammar);
-        const interfaces = ast.interfaces;
-        const unions = ast.unions.map(union => ({ name: union.name, types: translateTypeOption(union), hasInterfaceSubtypes: union.typeNames?.size > 0 }));
-        const rootType = getRootType(grammar);
-        if(!rootType) {
-            console.error(chalk.red("No entry rule found in the grammar"));
-            return;
+        const result = await buildVisitor(grammar, astPath, outputPath, id, projectName);
+        if(result) {
+            const { visitor, acceptWeaver, projectId } = result;
+            if(!fs.existsSync(outputPath)) {
+                fs.mkdirSync(outputPath);
+            }
+            fs.writeFileSync(path.join(outputPath, `${projectId}-visitor.ts`), visitor);
+            fs.writeFileSync(path.join(outputPath, `${projectId}-accept-weaver.ts`), acceptWeaver);
+            console.log(chalk.green("Files generated successfully."));
         }
-        const flattened = flattenInterfaces(interfaces);
-        const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
-        generateFiles(outputPath, astPath, id, projectName, translated, rootType, unions);
     }
+}
+
+
+/**
+ * Build the content of the visitor files from a Langium grammar
+ * @param grammar The Langium grammar
+ * @param astPath The path to the AST file, useful to compute relative import
+ * @param outputPath The path to the output directory, where to generate the visitor files
+ * @param id The ID of the project
+ * @param projectName The name of the project
+ * @returns The content of the visitor files and the project ID, or undefined if the grammar is invalid
+ */
+export async function buildVisitor(grammar: GrammarAST.Grammar, astPath: string, outputPath: string, id: string, projectName: string): Promise<{ visitor: string, acceptWeaver: string, projectId: string } | undefined> {
+    const ast = collectAst(grammar);
+    const interfaces = ast.interfaces;
+    const unions = ast.unions.map(union => ({ name: union.name, types: translateTypeOption(union), hasInterfaceSubtypes: union.typeNames?.size > 0 }));
+    const rootType = getRootType(grammar);
+    if(!rootType) {
+        console.error(chalk.red("No entry rule found in the grammar"));
+        return;
+    }
+    const flattened = flattenInterfaces(interfaces);
+    const translated = flattened.map(interface_ => translateFlattenedInterface(interface_));
+    return generateFiles(outputPath, astPath, id, projectName, translated, rootType, unions);
 }
 
 
@@ -222,7 +245,7 @@ function translateTypeOption(type: TypeOption): string {
 }
 
 /**
- * Generate the visitor files
+ * Build the content of the visitors files
  * @param outputDir The path to the output directory
  * @param astDir The path to the AST directory to compute import paths
  * @param projectId The ID of the project
@@ -230,8 +253,9 @@ function translateTypeOption(type: TypeOption): string {
  * @param interfaces The list of interfaces to generate
  * @param rootType The type of the entry rule of the grammar
  * @param unions The list of unions to generate
+ * @returns The content of the visitor files and the project ID
  */
-function generateFiles(outputDir: string, astDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[], rootType: string, unions: TranslatedTypeOption[]) {
+function generateFiles(outputDir: string, astDir: string, projectId: string, projectName: string, interfaces: FlattenedTranslatedInterface[], rootType: string, unions: TranslatedTypeOption[]): { visitor: string, acceptWeaver: string, projectId: string } {
     nunjucks.configure(templatesDir, { autoescape: false });
     let resolvedImportAst = path.relative(outputDir, astDir).replace(".ts", ".js").replaceAll("\\", "/");
 
@@ -243,11 +267,6 @@ function generateFiles(outputDir: string, astDir: string, projectId: string, pro
 
     const visitor = nunjucks.render('visitor.njk', { projectId, projectName, interfaces: interfaces, resolvedImportAst, rootType, unions, hasAnyReference });
     const acceptWeaver = nunjucks.render('accept-weaver.njk', { projectId, projectName, interfaces: interfaces.filter(interface_ => interface_.isConcrete), resolvedImportAst });
-    if(!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir);
-    }
-    fs.writeFileSync(path.join(outputDir, `${projectId}-visitor.ts`), visitor);
-    fs.writeFileSync(path.join(outputDir, `${projectId}-accept-weaver.ts`), acceptWeaver);
-    console.log(chalk.green("Files generated successfully."));
+    return { visitor, acceptWeaver, projectId };
 }
 

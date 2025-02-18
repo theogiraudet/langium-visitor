@@ -1,5 +1,5 @@
 import minimist from 'minimist';
-import { generate as main_generate } from './main.js';
+import { generateFromCli as main_generate } from './main.js';
 
 export function generate() {
     const args = minimist(process.argv.slice(2));

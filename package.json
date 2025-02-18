@@ -28,7 +28,8 @@
   "license": "MPL-2.0",
   "scripts": {
     "start": "tsc && node dist/main.js",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
@@ -37,8 +38,10 @@
     "@types/nunjucks": "^3.2.6",
     "eslint": "^9.18.0",
     "globals": "^15.14.0",
+    "langium-cli": "^3.3.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.21.0"
+    "typescript-eslint": "^8.21.0",
+    "vitest": "^3.0.6"
   },
   "dependencies": {
     "chalk": "^5.4.1",

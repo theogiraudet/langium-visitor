@@ -4,7 +4,7 @@
       "declaration": true,
       "target": "ESNext",
       "module": "Node16",
-      "rootDir": "./src",
+      "rootDir": ".",
       "outDir": "./dist",
       "moduleResolution": "node16",
       "esModuleInterop": true,
@@ -12,5 +12,9 @@
       "strict": true,
       "skipLibCheck": true,
       "sourceMap": true
-    }
+    },
+    "include": [
+      "src/**/*",
+      "tests/**/*"
+    ]
 }
