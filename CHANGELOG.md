@@ -5,6 +5,8 @@
 - Array of union types are now correctly translated into `Array<A | B>` instead of `A | B[]`.
 - The generator now generates types instead of classes for each AST Node. Since these classes were only used for TypeScript type-checking, this change has lightened the JavaScript code produced. 
 - Add type guards for each generated type.
+- Add CD pipeline to publish the package on npm.
+- Add some tests to the project.
 
 ## 1.2.0
 
