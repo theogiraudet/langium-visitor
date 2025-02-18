@@ -40,7 +40,7 @@ async function parseLangiumGrammarAndGenerate(outputPath: string, grammarPath: s
     if(grammar) {
         const ast = collectAst(grammar);
         const interfaces = ast.interfaces;
-        const unions = ast.unions.map(union => ({ name: union.name, types: translateTypeOption(union) }));
+        const unions = ast.unions.map(union => ({ name: union.name, types: translateTypeOption(union), hasInterfaceSubtypes: union.typeNames?.size > 0 }));
         const rootType = getRootType(grammar);
         if(!rootType) {
             console.error(chalk.red("No entry rule found in the grammar"));

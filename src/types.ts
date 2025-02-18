@@ -19,5 +19,6 @@ export type TranslatedAttribute = { name: string, type: string, isReference: boo
 
 export type TranslatedTypeOption = {
     name: string,
-    types: string
+    types: string,
+    hasInterfaceSubtypes: boolean
 }

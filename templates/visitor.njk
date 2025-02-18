@@ -82,9 +82,15 @@ export function is{{ interface.name }}(node: unknown): node is {{ interface.name
 {%- if unions.length > 0 %}
 /*
  * Each union type in the `ast.js` file have an equivalent generated type but using the visitor classes instead of the Langium interfaces/types.
- * This type is used to propose the `accept` method of their generated classes.
+ * This type is used to propose the `accept` method of their generated types.
  */
 {% for union in unions %}
 export type {{ union.name }} = {{ union.types }};
+{%- if union.hasInterfaceSubtypes %}
+
+export function is{{ union.name }}(node: unknown): node is {{ union.name }} {
+    return ASTInterfaces.is{{ union.name }}(node) && isAcceptor(node);
+}
+{%- endif %}
 {% endfor %}
 {%- endif %}

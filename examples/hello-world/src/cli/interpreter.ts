@@ -7,7 +7,6 @@ export class HelloWorldInterpreter implements HelloWorldVisitor {
     }
 
     visitModel(node: Model) {
-        node.persons.forEach(person => this.visitPerson(person));
         node.greetings.forEach(greeting => this.visitGreeting(greeting));
     }
 
