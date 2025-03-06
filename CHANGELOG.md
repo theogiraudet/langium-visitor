@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.4.0
+
+- The pipeline did not build sources.
+
 ## 1.3.0
 
 - Array of union types are now correctly translated into `Array<A | B>` instead of `A | B[]`.
