@@ -1,6 +1,6 @@
 {
   "name": "langium-visitor",
-  "version": "1.4.1",
+  "version": "1.4.5",
   "description": "A CLI tool to generate visitor classes for Langium grammars",
   "main": "index.js",
   "type": "module",

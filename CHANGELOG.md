@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.4.5
+
+- Fix circular dependency.
+- Fix CI pipeline.
+- Fix test execution.
+
 # 1.4.0
 
 - The pipeline did not build sources.
