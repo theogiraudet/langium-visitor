@@ -8,7 +8,7 @@ import { AstTypes, collectAst, InterfaceType, isArrayType, isInterfaceType, isPr
 import chalk from "chalk";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const templatesDir = path.resolve(__dirname, "..", "..", "templates");
+const templatesDir = path.resolve(__dirname, "..", "templates");
 
 /**
  * Generate the visitor files from a Langium grammar

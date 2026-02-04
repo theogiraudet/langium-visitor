@@ -5,6 +5,9 @@ export default defineConfig({
         deps: {
             interopDefault: true
         },
-        include: ['tests/**/*.test.ts']
+        include: ['tests/**/*.test.ts'],
+        typecheck: {
+            tsconfig: './tsconfig.test.json'
+        }
     }
 });

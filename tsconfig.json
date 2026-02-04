@@ -4,17 +4,12 @@
       "declaration": true,
       "target": "ESNext",
       "module": "Node16",
-      "rootDir": ".",
-      "outDir": "./dist",
       "moduleResolution": "node16",
       "esModuleInterop": true,
       "forceConsistentCasingInFileNames": true,  
       "strict": true,
       "skipLibCheck": true,
-      "sourceMap": true
-    },
-    "include": [
-      "src/**/*",
-      "tests/**/*"
-    ]
+      "sourceMap": true,
+      "noEmit": true
+    }
 }

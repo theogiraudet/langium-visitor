@@ -28,7 +28,7 @@
   "license": "MPL-2.0",
   "scripts": {
     "start": "tsc && node dist/main.js",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.src.json",
     "test": "vitest run"
   },
   "devDependencies": {
