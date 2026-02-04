@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.4.2
+
+- Fix circular dependency.
+
 # 1.4.0
 
 - The pipeline did not build sources.
