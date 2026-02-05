@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.4.6
+
+- Fix a bug with the CLI.
+
 # 1.4.5
 
 - Fix circular dependency.
